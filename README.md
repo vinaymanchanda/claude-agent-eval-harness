@@ -1,5 +1,7 @@
 # claude-agent-eval-harness
 
+[![evals](https://github.com/vinaymanchanda/claude-agent-eval-harness/actions/workflows/evals.yml/badge.svg)](https://github.com/vinaymanchanda/claude-agent-eval-harness/actions/workflows/evals.yml)
+
 A Claude tool-use agent, and the eval harness that decides whether it is
 actually any good.
 
