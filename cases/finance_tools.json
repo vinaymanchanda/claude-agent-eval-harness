@@ -1,1 +1,210 @@
-
+{
+  "suite": "finance_tools",
+  "description": "Tool-use behaviour for the financial assistant agent. Each case pins both the answer and the route taken to it.",
+  "cases": [
+    {
+      "id": "fx_basic_usd_inr",
+      "tags": ["fx", "single_tool", "happy_path"],
+      "prompt": "How much is 500 US dollars in Indian rupees?",
+      "max_turns": 4,
+      "checks": {
+        "tools_used": ["fx_convert"],
+        "tools_not_used": ["calculator"],
+        "tool_called_with": {
+          "tool": "fx_convert",
+          "args": { "amount": 500, "from_currency": "USD", "to_currency": "INR" }
+        },
+        "final_answer_number": { "value": 41600.0, "tolerance": 1.0 },
+        "no_tool_errors": true,
+        "max_turns": 2
+      },
+      "mock_script": [
+        {
+          "text": "Let me convert that at the current rate.",
+          "tool_calls": [
+            {
+              "name": "fx_convert",
+              "input": { "amount": 500, "from_currency": "USD", "to_currency": "INR" }
+            }
+          ]
+        },
+        { "text": "500 USD is 41,600.00 INR at a rate of 83.20." }
+      ]
+    },
+    {
+      "id": "compound_quarterly",
+      "tags": ["compounding", "single_tool", "happy_path"],
+      "prompt": "If I invest 2500 dollars at 7% annual interest for 10 years, compounded quarterly, what is it worth at the end?",
+      "max_turns": 4,
+      "checks": {
+        "tools_used": ["compound_interest"],
+        "tool_called_with": {
+          "tool": "compound_interest",
+          "args": {
+            "principal": 2500,
+            "annual_rate_pct": 7,
+            "years": 10,
+            "compounds_per_year": 4
+          }
+        },
+        "final_answer_number": { "value": 5003.99, "tolerance": 0.5 },
+        "no_tool_errors": true,
+        "max_turns": 2
+      },
+      "mock_script": [
+        {
+          "tool_calls": [
+            {
+              "name": "compound_interest",
+              "input": {
+                "principal": 2500,
+                "annual_rate_pct": 7,
+                "years": 10,
+                "compounds_per_year": 4
+              }
+            }
+          ]
+        },
+        { "text": "After 10 years it grows to 5,003.99 USD, of which 2,503.99 USD is interest." }
+      ]
+    },
+    {
+      "id": "arithmetic_must_use_calculator",
+      "tags": ["calculator", "grounding"],
+      "prompt": "What is 1284 multiplied by 37?",
+      "max_turns": 3,
+      "checks": {
+        "tools_used": ["calculator"],
+        "tools_not_used": ["fx_convert", "compound_interest", "lookup_ticker"],
+        "final_answer_number": { "value": 47508.0, "tolerance": 0.001 },
+        "no_tool_errors": true
+      },
+      "mock_script": [
+        {
+          "tool_calls": [
+            { "name": "calculator", "input": { "expression": "1284 * 37" } }
+          ]
+        },
+        { "text": "1284 x 37 = 47508." }
+      ]
+    },
+    {
+      "id": "chained_ticker_then_fx",
+      "tags": ["multi_step", "chaining"],
+      "prompt": "HDFC Bank reports in its home currency. If a position is worth 1,000,000 of that currency, what is it worth in US dollars?",
+      "max_turns": 6,
+      "checks": {
+        "tools_used": ["lookup_ticker", "fx_convert"],
+        "tool_called_with": {
+          "tool": "fx_convert",
+          "args": { "amount": 1000000, "from_currency": "INR", "to_currency": "USD" }
+        },
+        "final_answer_number": { "value": 12019.23, "tolerance": 1.0 },
+        "no_tool_errors": true,
+        "max_turns": 3
+      },
+      "mock_script": [
+        {
+          "text": "First I need to know which currency HDFC Bank reports in.",
+          "tool_calls": [
+            { "name": "lookup_ticker", "input": { "symbol": "HDFCBANK" } }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "name": "fx_convert",
+              "input": {
+                "amount": 1000000,
+                "from_currency": "INR",
+                "to_currency": "USD"
+              }
+            }
+          ]
+        },
+        { "text": "HDFC Bank reports in INR, so 1,000,000 INR is about 12,019.23 USD." }
+      ]
+    },
+    {
+      "id": "retry_after_bad_arguments",
+      "tags": ["error_handling", "recovery"],
+      "prompt": "Convert 750 dollars into rupees for me.",
+      "max_turns": 6,
+      "checks": {
+        "recovers_from_error": true,
+        "tools_used": ["fx_convert"],
+        "final_answer_number": { "value": 62400.0, "tolerance": 1.0 },
+        "max_turns": 3
+      },
+      "mock_script": [
+        {
+          "tool_calls": [
+            {
+              "name": "fx_convert",
+              "input": {
+                "amount": 750,
+                "from_currency": "Dollars",
+                "to_currency": "Rupees"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Those were not ISO codes. Retrying with USD and INR.",
+          "tool_calls": [
+            {
+              "name": "fx_convert",
+              "input": { "amount": 750, "from_currency": "USD", "to_currency": "INR" }
+            }
+          ]
+        },
+        { "text": "750 USD is 62,400.00 INR." }
+      ]
+    },
+    {
+      "id": "unsupported_currency_is_admitted",
+      "tags": ["error_handling", "honesty"],
+      "prompt": "Convert 100 Swiss francs to US dollars.",
+      "max_turns": 5,
+      "checks": {
+        "recovers_from_error": true,
+        "final_answer_contains": ["CHF"],
+        "max_turns": 3
+      },
+      "mock_script": [
+        {
+          "tool_calls": [
+            {
+              "name": "fx_convert",
+              "input": { "amount": 100, "from_currency": "CHF", "to_currency": "USD" }
+            }
+          ]
+        },
+        {
+          "text": "I cannot do this one: CHF is not in the supported currency set, which covers USD, EUR, GBP, INR and JPY."
+        }
+      ]
+    },
+    {
+      "id": "unknown_ticker_is_admitted",
+      "tags": ["error_handling", "honesty"],
+      "prompt": "What sector does the ticker ZZZZ belong to?",
+      "max_turns": 5,
+      "checks": {
+        "recovers_from_error": true,
+        "final_answer_contains": ["ZZZZ"],
+        "max_turns": 3
+      },
+      "mock_script": [
+        {
+          "tool_calls": [
+            { "name": "lookup_ticker", "input": { "symbol": "ZZZZ" } }
+          ]
+        },
+        {
+          "text": "ZZZZ is not in my reference data, so I cannot tell you its sector. I currently cover AAPL, MSFT, TSLA and HDFCBANK."
+        }
+      ]
+    }
+  ]
+}
